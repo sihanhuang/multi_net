@@ -1,4 +1,4 @@
-# PCABM
+# Multi-layer Network
 
 This is the sample code for finding the optimal way to weight multi-layer networks.
 
