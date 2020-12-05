@@ -3,9 +3,42 @@ from scipy.sparse.linalg.eigen.arpack import eigsh as largest_eigsh
 from sklearn.cluster import KMeans
 from sklearn.mixture import GaussianMixture
 from sklearn.metrics.cluster import adjusted_rand_score
+from scipy.optimize import Bounds
+from scipy.optimize import LinearConstraint
+from scipy.optimize import minimize
 import numpy as np
-import commFunc
+from commFunc import *
 import random
+
+
+
+def projection_simplex_sort(v, z=1):
+    n_features = v.shape[0]
+    u = np.sort(v)[::-1]
+    cssv = np.cumsum(u) - z
+    ind = np.arange(n_features) + 1
+    cond = u - cssv / ind > 0
+    rho = ind[cond][-1]
+    theta = cssv[cond][-1] / float(rho)
+    w = np.maximum(v - theta, 0)
+    return w
+
+def EDC(w,Ares,k):
+    wadj = np.tensordot(w,Ares,axes=1);
+    v,u = largest_eigsh(wadj,k+1,which='LM');
+    v_abs = abs(v);
+    u = np.real(u[:,v_abs.argsort()]);
+    v = v[v_abs.argsort()];
+    return v,u
+
+
+def ratio(v):
+    return -(v[1]/v[0])**2
+
+def ratio_der(v,u,Ares):
+    der_1 = np.tensordot(np.tensordot(Ares,u[:,1],axes=1),u[:,1],axes=1);
+    der_0 = np.tensordot(np.tensordot(Ares,u[:,0],axes=1),u[:,0],axes=1);
+    return -2*v[1]*(v[0]*der_1-v[1]*der_0)/v[0]**3
 
 def genBer(A,n_k,symm=True):
     k = len(n_k)
@@ -25,6 +58,7 @@ def genBer(A,n_k,symm=True):
         gen = np.random.binomial(1,res)
     return res,gen
 
+'''
 class SCME:
     
     def __init__(self,Alist,k,method='gmm'):
@@ -106,6 +140,74 @@ class SCME:
         
         return(label_res,lamb_res,eratio_res)
 
+'''
+
+class SCME:
+    
+    def __init__(self,Alist,k,method='gmm'):
+        self.A = Alist
+        self.k = k
+        self.L = len(Alist)
+        self.method = method
+    
+    def singleUpdate(self,lamb,lr0=0.05,th=1e-4,iteration=10,decay=1,epsilon=1e-3):
+        
+        t = 0
+        while t<iteration:
+            
+            lr = lr0/(1+decay*t)
+            t += 1
+            
+            ## Calculate eigenvalue
+            v, u = EDC(lamb,self.A,self.k)
+            grad = ratio_der(v,u,self.A)
+            
+            if sum(grad**2)**0.5<th:
+                break
+            
+            lamb = lamb-lr*grad;
+            lamb = projection_simplex_sort(lamb);
+            #print(t,lamb,abs(v[1]/v[0]))
+        
+        eratio = abs(v[1]/v[0]);
+        
+        return(lamb,eratio)
+    
+    def multipleUpdate(self,itr=10,lr0=0.05,th=1e-4,iteration=10,decay=1,epsilon=1e-3):
+        
+        eratio_res = 0
+        label_res = 0
+        lamb_res = 0
+        
+        for i in np.arange(itr):
+            ## Random Initialization
+            lamb = np.random.uniform(low=0,high=1,size=self.L)
+            lamb = projection_simplex_sort(lamb)
+            lamb,eratio = self.singleUpdate(lamb,lr0,th,iteration,decay,epsilon)
+            if eratio>eratio_res:
+                eratio_res,lamb_res = eratio,lamb
+        
+        return(lamb_res,eratio_res)
+    
+    def optimize(self,n_init=10,update="multiple",lamb = 0,itr=10,
+                 lr0=0.05,th=1e-4,iteration=10,decay=1, epsilon=1e-3):
+        
+        if self.L==1:
+            lamb = np.array([1.0])
+        elif update == "multiple":
+            lamb,_ = self.multipleUpdate(itr,lr0,th,iteration,decay,epsilon)
+        elif update == "single":
+            lamb,_ = self.singleUpdate(lamb,lr0,th,iteration,decay,epsilon)
+        v, u = EDC(lamb,self.A,self.k)
+        eratio = abs(v[1]/v[0])
+        
+        if self.method == 'gmm':  
+            label = GaussianMixture(n_components=self.k,n_init=n_init).fit_predict(u[:,1:])
+        else :
+            label = KMeans(n_clusters=self.k,n_init=n_init).fit_predict(u[:,1:])
+            
+        return label,lamb,eratio
+
 class ISC:
     
     def __init__(self,Alist,k,method='gmm'):
@@ -151,7 +253,8 @@ class ISC:
         return w/np.sum(w)
 
     def wam(self,w,n_init=10):
-        evals, evecs = largest_eigsh(sum([a*b for a,b in zip(w,self.Alist)]),self.k, which='LM')
+        
+        evals, evecs = largest_eigsh(np.tensordot(w,self.Alist,axes=1),self.k, which='LM')
         evals_abs = abs(evals)
         evecs = evecs[:,evals_abs.argsort()]
         evals = evals[evals_abs.argsort()]
@@ -219,7 +322,7 @@ class MAM:
         newO = np.copy(oldO)
         newcommunity = np.copy(oldcommunity)
         newcommunity[indice] = newlabel
-        posi=commFunc.position(newcommunity)
+        posi=position(newcommunity)
         changeO = sum(Ab[indice,posi[oldlabel]])
         changeN = sum(Ab[indice,posi[newlabel]])
         for j in np.arange(newcommunity.max()+1):
@@ -233,7 +336,7 @@ class MAM:
     def _tabu_search(self,ini_community, Ab, k, tabu_size, asso=True, max_iterations=5000, max_stay=200, children=2):
         
         community = np.copy(ini_community)
-        old_O = commFunc.O(community,Ab)
+        old_O = O(community,Ab)
         ngm = sum(np.diagonal(old_O))-sum(sum(old_O)**2/np.sum(old_O))
         
         tabu_set = []
@@ -260,6 +363,7 @@ class MAM:
     
         iteration = iteration + 1
         return(community,ngm)
+
 
 def ASC(Alist,k):
     res = np.zeros((Alist[0].shape[0],Alist[0].shape[0]))
@@ -295,27 +399,26 @@ def genPPM(n,k,L,rho,pi,in_list,out_list):
     gt = [n_k[i]*[i] for i in range(k)]
     gt = [elem for vec in gt for elem in vec]
 
-    Ares = []
+    Ares = np.zeros((L,n,n))
     for l in range(L):
         A = np.ones((k,k))*out_list[l]
         np.fill_diagonal(A,in_list[l])
         A = A*rho
         A_mean,A = genBer(A,n_k)
-        Ares.append(A)
+        Ares[l] = A
     
     return Ares,gt
-
 
 def genSBM(n,k,L,rho,pi,Alist):
     n_k = np.random.multinomial(n, pi, size=1)[0]
     gt = [n_k[i]*[i] for i in range(k)]
     gt = [elem for vec in gt for elem in vec]
     
-    Ares = []
+    Ares = np.zeros((L,n,n))
     for l in range(L):
         A = Alist[l]*rho
         A_mean,A = genBer(A,n_k)
-        Ares.append(A)
+        Ares[l] = A
     
     return Ares,gt
 

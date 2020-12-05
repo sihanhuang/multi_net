@@ -45,5 +45,3 @@ def nLLGamma(gamma,e,Ab,Z):
     n = Ab.shape[0]
     A = np.tril(Ab,-1)
     return (np.sum(O(e,Ab)*np.log(E(e,gamma,Z)))/2-np.sum(A*np.dot(Z,gamma)))/(n**2)
-
-
