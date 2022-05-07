@@ -58,89 +58,6 @@ def genBer(A,n_k,symm=True):
         gen = np.random.binomial(1,res)
     return res,gen
 
-'''
-class SCME:
-    
-    def __init__(self,Alist,k,method='gmm'):
-        self.A = Alist
-        self.k = k
-        self.L = len(Alist)
-        self.method = method
-    
-    def singleUpdate(self,lamb,lr0=1,th=1e-4,iteration=30,decay=1,epsilon=1e-3,n_init=10):
-        
-        lamb = [float(i) for i in lamb]
-        
-        Amean = sum(self.A)/(self.L-1)
-        t = 0
-        
-        while t<iteration:
-            
-            lr = lr0/(1+decay*t)
-            t += 1
-            
-            ## Calculate eigenvalue
-            
-            evals, evecs = largest_eigsh(sum([a*b for a,b in zip(lamb,self.A)]), self.k+1, which='LM')
-            evals_abs = abs(evals)
-            evecs = evecs[:,evals_abs.argsort()]
-            evals = evals[evals_abs.argsort()]
-            
-            ## Calculate gradient
-            
-            grad_k = np.array([evecs[:,1].dot(x-Amean).dot(evecs[:,1])*np.sign(evals[1]) for x in self.A])*self.L/(self.L-1)
-            grad_k1 = np.array([evecs[:,0].dot(x-Amean).dot(evecs[:,0])*np.sign(evals[0]) for x in self.A])*self.L/(self.L-1)
-            grad = (grad_k*abs(evals[0])-grad_k1*abs(evals[1]))/evals[0]**2
-            
-            #print(t,':',lamb,grad)
-            ## Update lambda if gradient large enough, o.w. break
-            
-            if sum(grad**2)**0.5<th:
-                break
-            else:
-                grad /= sum(grad**2)**0.5
-            
-            lamb = lamb+lr*grad;
-            lamb = abs(lamb)/sum(lamb)
-        
-        eratio = abs(evals[1])/abs(evals[0])
-        
-        if self.method == 'gmm':
-            label = GaussianMixture(n_components=self.k,n_init=n_init).fit_predict(np.real(evecs[:,1:]))
-        else :
-            label = KMeans(n_clusters=self.k,n_init=n_init).fit_predict(np.real(evecs[:,1:]))
-        
-        return(label,lamb,eratio)
-    
-    def multipleUpdate(self,itr=5,lr0=0.5,th=1e-4,iteration=30,decay=1,epsilon=1e-3,n_init=10):
-        if self.L==1:
-            ## Calculate eigenvalue
-            evals, evecs = largest_eigsh(self.A[0].astype(float), self.k+1, which='LM')
-            evals_abs = abs(evals)
-            evecs = evecs[:,evals_abs.argsort()]
-            evals = evals[evals_abs.argsort()]
-            if self.method == 'gmm':
-                label = GaussianMixture(n_components=self.k,n_init=n_init).fit_predict(np.real(evecs[:,1:]))
-            else:
-                label = KMeans(n_clusters=self.k,n_init=n_init).fit_predict(np.real(evecs[:,1:]))
-            
-            return(label,[1],evals_abs[1]/evals_abs[0])
-        
-        eratio_res = 0
-        
-        for i in np.arange(itr):
-            
-            ## Random Initialization
-            lamb = np.random.randint(low=1,high=10,size=self.L)
-            lamb = abs(lamb)/sum(lamb)
-            
-            label,lamb,eratio = self.singleUpdate(lamb,lr0,th,iteration,decay,epsilon,n_init)
-            if eratio>eratio_res:
-                eratio_res,label_res,lamb_res = eratio,label,lamb
-        
-        return(label_res,lamb_res,eratio_res)
-
-'''
 
 class SCME:
     
@@ -245,7 +162,7 @@ class ISC:
                 else:
                     label = KMeans(n_clusters=self.k,n_init=n_init).fit_predict(np.real(evecs[:,:]))
     
-        w[i] = self.weight_single(self.Alist[i],label)
+            w[i] = self.weight_single(self.Alist[i],label)
         
         w = np.maximum(w,np.zeros(self.L))
         if np.sum(w)==0:
