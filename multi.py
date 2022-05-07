@@ -11,7 +11,6 @@ from commFunc import *
 import random
 
 
-
 def projection_simplex_sort(v, z=1):
     n_features = v.shape[0]
     u = np.sort(v)[::-1]
@@ -149,18 +148,8 @@ class ISC:
         w = np.empty(self.L)
         
         for i in range(len(self.Alist)):
-            
             if init:
-                evals, evecs = largest_eigsh(self.Alist[i].astype(float),self.k, which='LM')
-                evals_abs = abs(evals)
-                evecs = evecs[:,evals_abs.argsort()]
-                evals = evals[evals_abs.argsort()]
-                
-                if self.method == 'gmm':
-                    evecs_mean = np.zeros((self.k,self.k))
-                    label = GaussianMixture(n_components=self.k,n_init=n_init).fit_predict(np.real(evecs[:,:]))
-                else:
-                    label = KMeans(n_clusters=self.k,n_init=n_init).fit_predict(np.real(evecs[:,:]))
+                label = SC(self.Alist[i].astype(float), self.k, method = self.method)
     
             w[i] = self.weight_single(self.Alist[i],label)
         
@@ -170,18 +159,7 @@ class ISC:
         return w/np.sum(w)
 
     def wam(self,w,n_init=10):
-        
-        evals, evecs = largest_eigsh(np.tensordot(w,self.Alist,axes=1),self.k, which='LM')
-        evals_abs = abs(evals)
-        evecs = evecs[:,evals_abs.argsort()]
-        evals = evals[evals_abs.argsort()]
-        
-        if self.method =='gmm':
-            evecs_mean = np.zeros((self.k,self.k))
-            label = GaussianMixture(n_components=self.k,n_init=n_init).fit_predict(np.real(evecs[:,:]))
-        else:
-            label = KMeans(n_clusters=self.k,n_init=n_init).fit_predict(np.real(evecs[:,:]))
-        return label
+        return SC(np.tensordot(w,self.Alist,axes=1),self.k,method = self.method)
     
     def opt(self,eps=1e-4,max_it=100,n_init=10):
         
@@ -340,11 +318,13 @@ def genSBM(n,k,L,rho,pi,Alist):
     return Ares,gt
 
 
-def SC(matrix,k):
+def SC(matrix,k,method = 'km'):
     evals, evecs = largest_eigsh(matrix,k,which='LM')
     evals_abs = abs(evals)
     evecs = evecs[:,evals_abs.argsort()]
     evals = evals[evals_abs.argsort()]
-    model = KMeans(n_clusters=k).fit(np.real(evecs))
-    label = model.predict(np.real(evecs))
+    if method =='gmm':
+        label = GaussianMixture(n_components=self.k,n_init=n_init).fit_predict(np.real(evecs[:,:]))
+    else:
+        label = KMeans(n_clusters=self.k,n_init=n_init).fit_predict(np.real(evecs[:,:]))
     return label
