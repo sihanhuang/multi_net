@@ -7,7 +7,7 @@ from scipy.optimize import Bounds
 from scipy.optimize import LinearConstraint
 from scipy.optimize import minimize
 import numpy as np
-from commFunc import *
+import commFunc 
 import random
 
 
@@ -217,7 +217,7 @@ class MAM:
         newO = np.copy(oldO)
         newcommunity = np.copy(oldcommunity)
         newcommunity[indice] = newlabel
-        posi=position(newcommunity)
+        posi=commFunc.position(newcommunity)
         changeO = sum(Ab[indice,posi[oldlabel]])
         changeN = sum(Ab[indice,posi[newlabel]])
         for j in np.arange(newcommunity.max()+1):
@@ -231,7 +231,7 @@ class MAM:
     def _tabu_search(self,ini_community, Ab, k, tabu_size, asso=True, max_iterations=5000, max_stay=200, children=2):
         
         community = np.copy(ini_community)
-        old_O = O(community,Ab)
+        old_O = commFunc.O(community,Ab)
         ngm = sum(np.diagonal(old_O))-sum(sum(old_O)**2/np.sum(old_O))
         
         tabu_set = []
@@ -256,7 +256,7 @@ class MAM:
                     community[index] = label
                     ngm = new_ngm
     
-        iteration = iteration + 1
+            iteration = iteration + 1
         return(community,ngm)
 
 
@@ -318,13 +318,13 @@ def genSBM(n,k,L,rho,pi,Alist):
     return Ares,gt
 
 
-def SC(matrix,k,method = 'km'):
+def SC(matrix,k,method = 'km',n_init = 30):
     evals, evecs = largest_eigsh(matrix,k,which='LM')
     evals_abs = abs(evals)
     evecs = evecs[:,evals_abs.argsort()]
     evals = evals[evals_abs.argsort()]
     if method =='gmm':
-        label = GaussianMixture(n_components=self.k,n_init=n_init).fit_predict(np.real(evecs[:,:]))
+        label = GaussianMixture(n_components=k,n_init=n_init).fit_predict(np.real(evecs[:,:]))
     else:
-        label = KMeans(n_clusters=self.k,n_init=n_init).fit_predict(np.real(evecs[:,:]))
+        label = KMeans(n_clusters=k,n_init=n_init).fit_predict(np.real(evecs[:,:]))
     return label
