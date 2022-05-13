@@ -30,6 +30,18 @@ def EDC(w,Ares,k):
     v = v[v_abs.argsort()];
     return v,u
 
+def tau_cal(n,rho,k,in_list,out_list):
+    L = len(in_list)
+    res = 0
+    for i in range(L):
+        p = rho*in_list[i]
+        q = rho*out_list[i]
+        b = p-q
+        c = p*(1-p)+(k-1)*q*(1-q)
+        res+=b**2/c
+
+    return res*n
+
 
 def ratio(v):
     return -(v[1]/v[0])**2
