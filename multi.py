@@ -295,7 +295,7 @@ def ASC(Alist,k):
 
 def lam_norm(in_list,out_list,k=2):
     w = [(x-y)/(x+(k-1)*y) for x,y in zip(in_list,out_list)]
-    return([x/sum(w) for x in w])
+    return([x/sum([abs(x) for x in w]) for x in w])
 
 def cond_num(in_list,out_list,k,n,rho):
     return sum([(x-y)/(x+(k-1)*y) for x,y in zip(in_list,out_list)])*n*rho/k
